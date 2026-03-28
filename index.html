@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DUExt — Download · Upload · Extract</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #05070f;
+    --surface: #0c1018;
+    --surface2: #131925;
+    --border: #1e2738;
+    --text: #e8eef8;
+    --muted: #6b7a99;
+    --cyan: #00e5ff;
+    --green: #00ff88;
+    --orange: #ff7b3a;
+    --purple: #b06eff;
+    --pink: #ff4da6;
+    --yellow: #ffd600;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* CANVAS BG */
+  #bgCanvas {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+  }
+
+  /* GRID OVERLAY */
+  .grid-overlay {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+
+  /* LAYOUT */
+  .wrapper { position: relative; z-index: 1; max-width: 940px; margin: 0 auto; padding: 0 20px 80px; }
+
+  /* API KEY BANNER */
+  .api-banner {
+    background: linear-gradient(135deg, #ff7b3a18, #b06eff18);
+    border: 1px solid #ff7b3a44;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex; gap: 12px; align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .api-banner-icon { font-size: 22px; flex-shrink: 0; }
+  .api-banner-text { flex: 1; min-width: 200px; }
+  .api-banner-text strong { color: var(--orange); font-size: 14px; display: block; margin-bottom: 3px; }
+  .api-banner-text span { font-size: 12px; color: var(--muted); }
+  .api-input-row { display: flex; gap: 8px; width: 100%; margin-top: 10px; }
+  .api-input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 14px; color: var(--text);
+    font-family: 'Outfit', sans-serif; font-size: 13px; outline: none;
+    transition: border-color .2s;
+  }
+  .api-input:focus { border-color: var(--orange); }
+  .api-save-btn {
+    background: var(--orange); color: #000; border: none; border-radius: 8px;
+    padding: 9px 18px; font-family: 'Outfit', sans-serif; font-weight: 700;
+    font-size: 13px; cursor: pointer; transition: opacity .2s;
+  }
+  .api-save-btn:hover { opacity: .85; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 0 0; gap: 16px; flex-wrap: wrap;
+  }
+  .lang-switcher { display: flex; gap: 4px; flex-wrap: wrap; }
+  .lang-btn {
+    padding: 5px 11px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-family: 'Outfit', sans-serif;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s;
+  }
+  .lang-btn.active {
+    border-color: var(--cyan); color: var(--cyan);
+    background: rgba(0,229,255,.08);
+  }
+  .lang-btn:hover:not(.active) { border-color: var(--border); color: var(--text); }
+
+  /* HEADER */
+  .header { text-align: center; padding: 36px 0 28px; }
+  .logo {
+    font-family: 'Syne', sans-serif; font-size: 62px; font-weight: 800;
+    line-height: 1; letter-spacing: -3px;
+    background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 50%, var(--pink) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    animation: logoGlow 4s ease-in-out infinite alternate;
+  }
+  @keyframes logoGlow {
+    from { filter: drop-shadow(0 0 20px rgba(0,229,255,.3)); }
+    to { filter: drop-shadow(0 0 40px rgba(176,110,255,.5)); }
+  }
+  .tagline {
+    color: var(--muted); font-size: 12px; letter-spacing: 4px;
+    text-transform: uppercase; margin-top: 6px; font-weight: 500;
+  }
+  .badges { display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .badge-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    border: 1px solid; letter-spacing: .5px;
+  }
+  .badge-cyan { border-color: rgba(0,229,255,.4); color: var(--cyan); background: rgba(0,229,255,.07); }
+  .badge-green { border-color: rgba(0,255,136,.4); color: var(--green); background: rgba(0,255,136,.07); }
+  .badge-orange { border-color: rgba(255,123,58,.4); color: var(--orange); background: rgba(255,123,58,.07); }
+  .badge-purple { border-color: rgba(176,110,255,.4); color: var(--purple); background: rgba(176,110,255,.07); }
+
+  /* TRUST BAR */
+  .trust-bar {
+    display: flex; gap: 0; justify-content: center; align-items: stretch;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .trust-item {
+    flex: 1; min-width: 140px; padding: 14px 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-right: 1px solid var(--border); transition: background .2s;
+  }
+  .trust-item:last-child { border-right: none; }
+  .trust-item:hover { background: var(--surface2); }
+  .trust-icon { font-size: 20px; flex-shrink: 0; }
+  .trust-label { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .trust-value { font-size: 13px; color: var(--text); font-weight: 600; margin-top: 1px; }
+
+  /* TABS */
+  .tabs {
+    display: flex; gap: 4px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 14px; padding: 5px;
+    margin-bottom: 20px;
+  }
+  .tab {
+    flex: 1; padding: 11px 8px; border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+    transition: all .25s; color: var(--muted); background: transparent;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tab.active-url { background: var(--cyan); color: #000; }
+  .tab.active-image { background: var(--purple); color: #fff; }
+  .tab.active-file { background: var(--green); color: #000; }
+  .tab.active-yt { background: var(--orange); color: #000; }
+  .tab:not(.active-url):not(.active-image):not(.active-file):not(.active-yt):hover {
+    background: var(--surface2); color: var(--text);
+  }
+
+  /* CARD */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; overflow: hidden;
+    box-shadow: 0 4px 40px rgba(0,0,0,.4);
+    animation: cardIn .35s ease;
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card-header {
+    padding: 22px 26px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .card-icon { font-size: 26px; }
+  .card-title { font-size: 18px; font-weight: 700; color: var(--text); font-family: 'Syne', sans-serif; }
+  .card-desc { font-size: 12px; color: var(--muted); margin-top: 3px; font-weight: 400; }
+  .card-body { padding: 26px; }
+
+  /* INPUTS */
+  label.lbl {
+    display: block; font-size: 11px; color: var(--muted);
+    margin-bottom: 7px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600;
+  }
+  input.inp, select.sel {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; color: var(--text);
+    font-family: 'Outfit', sans-serif; font-size: 14px; outline: none;
+    transition: border-color .2s; appearance: none;
+  }
+  input.inp:focus, select.sel:focus { border-color: rgba(0,229,255,.5); }
+
+  /* BUTTONS */
+  .btn-primary {
+    padding: 12px 26px; border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700;
+    transition: all .2s; letter-spacing: .3px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: .85; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,255,.25); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    padding: 12px 20px; border-radius: 10px; border: 1px solid var(--border);
+    cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600;
+    transition: all .2s; background: var(--surface2); color: var(--text);
+  }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--purple); color: var(--purple); }
+  .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-download {
+    padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700;
+    background: var(--green); color: #000; transition: all .2s;
+  }
+  .btn-download:hover { opacity: .85; transform: translateY(-1px); }
+
+  /* ROW */
+  .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .row > * { min-width: 0; }
+  .flex1 { flex: 1; }
+
+  /* MODE PILLS */
+  .mode-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mode-pill {
+    padding: 7px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; font-family: 'Outfit', sans-serif;
+    font-size: 12px; font-weight: 600; transition: all .2s;
+  }
+  .mode-pill.active {
+    border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,.08);
+  }
+  .mode-pill:hover:not(.active) { border-color: var(--muted); color: var(--text); }
+
+  /* RESULT */
+  .result-box {
+    margin-top: 20px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; animation: fadeIn .4s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .result-text { font-size: 14px; line-height: 1.75; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+
+  /* STATUS BADGE */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
+    margin-bottom: 12px; letter-spacing: .5px;
+  }
+  .status-ok { background: rgba(0,255,136,.12); color: var(--green); border: 1px solid rgba(0,255,136,.3); }
+  .status-ai { background: rgba(176,110,255,.12); color: var(--purple); border: 1px solid rgba(176,110,255,.3); }
+  .status-err { background: rgba(255,77,166,.12); color: var(--pink); border: 1px solid rgba(255,77,166,.3); }
+
+  /* UPLOAD ZONE */
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 36px 20px; text-align: center; cursor: pointer;
+    transition: all .25s; position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: var(--purple); background: rgba(176,110,255,.05); }
+  .drop-zone input { display: none; }
+  .drop-icon { font-size: 36px; margin-bottom: 10px; }
+  .drop-label { font-size: 14px; color: var(--muted); }
+  .drop-sub { font-size: 11px; color: var(--border); margin-top: 4px; letter-spacing: 1px; }
+
+  /* TAG CHIPS */
+  .chip {
+    display: inline-block; padding: 2px 9px; border-radius: 5px;
+    background: var(--border); color: var(--muted); font-size: 11px; margin: 2px;
+    font-weight: 600; letter-spacing: .5px;
+  }
+
+  /* WARNING */
+  .warn-box {
+    background: rgba(255,214,0,.07); border: 1px solid rgba(255,214,0,.25);
+    border-radius: 10px; padding: 14px 18px; font-size: 13px;
+    color: #ffd600; margin-top: 16px; line-height: 1.6;
+  }
+
+  /* DIVIDER */
+  hr.div { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+
+  /* SPINNER */
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid transparent; border-top-color: currentColor;
+    border-radius: 50%; animation: spin .65s linear infinite;
+    vertical-align: middle; margin-right: 7px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* RANGE */
+  input[type=range] { width: 100%; accent-color: var(--purple); cursor: pointer; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center; margin-top: 40px; padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .footer-team {
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-block; letter-spacing: 1px;
+  }
+  .footer-copy { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .footer-links { display: flex; justify-content: center; gap: 20px; margin-top: 10px; }
+  .footer-link { font-size: 11px; color: var(--muted); text-decoration: none; transition: color .2s; }
+  .footer-link:hover { color: var(--cyan); }
+
+  /* PANEL HIDDEN */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* IMAGE PREVIEW */
+  .img-preview {
+    max-height: 180px; max-width: 100%;
+    border-radius: 8px; border: 1px solid var(--border);
+    display: block; margin: 10px auto 0;
+  }
+
+  /* SECTION TITLE */
+  .section-mt { margin-top: 18px; }
+
+  @media(max-width:600px) {
+    .logo { font-size: 42px; }
+    .trust-item { min-width: 120px; }
+    .tab { font-size: 11px; padding: 10px 4px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="grid-overlay"></div>
+
+<div class="wrapper">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);letter-spacing:2px;">DUExt</div>
+    <div class="lang-switcher" id="langSwitcher"></div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">DUExt</div>
+    <div class="tagline" id="txt-tagline">Download · Upload · Extract</div>
+    <div class="badges" style="margin-top:14px;">
+      <span class="badge-pill badge-cyan" id="txt-badge1">⚡ AI Powered</span>
+      <span class="badge-pill badge-green" id="txt-badge2">🔒 100% Secure</span>
+      <span class="badge-pill badge-orange" id="txt-badge3">🌍 6 Languages</span>
+      <span class="badge-pill badge-purple" id="txt-badge4">✦ Free to Use</span>
+    </div>
+  </div>
+
+  <!-- API KEY BANNER REMOVED - proxy handles key -->
+
+  <!-- TRUST BAR -->
+  <div class="trust-bar">
+    <div class="trust-item">
+      <span class="trust-icon">🔒</span>
+      <div>
+        <div class="trust-value" id="txt-t1v">SSL Secured</div>
+        <div class="trust-label" id="txt-t1l">End-to-end encrypted</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <span class="trust-icon">🛡️</span>
+      <div>
+        <div class="trust-value" id="txt-t2v">No Data Saved</div>
+        <div class="trust-label" id="txt-t2l">We never store your files</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <span class="trust-icon">⚡</span>
+      <div>
+        <div class="trust-value" id="txt-t3v">Instant Processing</div>
+        <div class="trust-label" id="txt-t3l">Results in seconds</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <span class="trust-icon">🤖</span>
+      <div>
+        <div class="trust-value" id="txt-t4v">Claude AI</div>
+        <div class="trust-label" id="txt-t4l">Powered by Anthropic</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active-url" onclick="switchTab('url',this)" data-tab="url" id="tab-url">🔗 <span id="txt-tab-url">URL Analyze</span></button>
+    <button class="tab" onclick="switchTab('image',this)" data-tab="image" id="tab-image">🖼️ <span id="txt-tab-image">Image</span></button>
+    <button class="tab" onclick="switchTab('file',this)" data-tab="file" id="tab-file">📄 <span id="txt-tab-file">File</span></button>
+    <button class="tab" onclick="switchTab('yt',this)" data-tab="yt" id="tab-yt">📺 <span id="txt-tab-yt">YouTube</span></button>
+  </div>
+
+  <!-- PANELS -->
+
+  <!-- URL PANEL -->
+  <div class="card panel active" id="panel-url">
+    <div class="card-header">
+      <span class="card-icon">🔗</span>
+      <div>
+        <div class="card-title" id="txt-url-title">URL Analysis & Summarization</div>
+        <div class="card-desc" id="txt-url-desc">Analyze any web page — summarize, extract keywords, sentiment & SEO insights</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <label class="lbl" id="txt-url-lbl">Web Page URL</label>
+      <input class="inp" id="urlInput" placeholder="https://example.com/article" onkeydown="if(event.key==='Enter')analyzeUrl()" />
+      <div class="section-mt">
+        <label class="lbl" id="txt-url-mode">Analysis Type</label>
+        <div class="mode-pills">
+          <button class="mode-pill active" onclick="setMode('url','summary',this)" id="txt-m-summary">Summary</button>
+          <button class="mode-pill" onclick="setMode('url','keywords',this)" id="txt-m-keywords">Keywords</button>
+          <button class="mode-pill" onclick="setMode('url','sentiment',this)" id="txt-m-sentiment">Sentiment</button>
+          <button class="mode-pill" onclick="setMode('url','seo',this)" id="txt-m-seo">SEO Report</button>
+        </div>
+      </div>
+      <div class="section-mt">
+        <button class="btn-primary" onclick="analyzeUrl()" id="urlBtn">▶ <span id="txt-url-btn">Analyze</span></button>
+      </div>
+      <div id="urlResult"></div>
+    </div>
+  </div>
+
+  <!-- IMAGE PANEL -->
+  <div class="card panel" id="panel-image">
+    <div class="card-header">
+      <span class="card-icon">🖼️</span>
+      <div>
+        <div class="card-title" id="txt-img-title">Image Conversion & AI Analysis</div>
+        <div class="card-desc" id="txt-img-desc">Convert between PNG / JPEG / WebP — and analyze with AI</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="drop-zone" id="imgDropZone" onclick="document.getElementById('imgFileInput').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleImgDrop(event)">
+        <input type="file" id="imgFileInput" accept="image/*" onchange="handleImgFile(this.files[0])" />
+        <div id="imgDropContent">
+          <div class="drop-icon">📁</div>
+          <div class="drop-label" id="txt-img-drop">Drop an image or click to browse</div>
+          <div class="drop-sub">PNG · JPEG · WebP · BMP · GIF</div>
+        </div>
+      </div>
+      <div id="imgControls" style="display:none">
+        <div class="section-mt">
+          <div class="row">
+            <div class="flex1">
+              <label class="lbl" id="txt-img-fmt">Output Format</label>
+              <select class="sel" id="imgFormat" style="width:auto">
+                <option value="image/png">PNG</option>
+                <option value="image/jpeg">JPEG</option>
+                <option value="image/webp">WebP</option>
+              </select>
+            </div>
+            <div class="flex1" id="qualityWrap">
+              <label class="lbl">Quality: <span id="qualLabel">90</span>%</label>
+              <input type="range" min="10" max="100" value="90" id="qualRange"
+                oninput="document.getElementById('qualLabel').textContent=this.value" />
+            </div>
+          </div>
+        </div>
+        <div class="section-mt" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn-primary" onclick="convertImage()" id="txt-img-conv-btn">🔄 Convert</button>
+          <button class="btn-secondary" onclick="analyzeImageAI()" id="txt-img-ai-btn">🤖 AI Analyze</button>
+        </div>
+        <div id="imgResult"></div>
+      </div>
+      <canvas id="convertCanvas" style="display:none"></canvas>
+    </div>
+  </div>
+
+  <!-- FILE PANEL -->
+  <div class="card panel" id="panel-file">
+    <div class="card-header">
+      <span class="card-icon">📄</span>
+      <div>
+        <div class="card-title" id="txt-file-title">File Analysis & Processing</div>
+        <div class="card-desc" id="txt-file-desc">Analyze PDF, TXT, CSV and other documents with AI</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="margin-bottom:10px;">
+        <span class="chip">PDF</span><span class="chip">TXT</span><span class="chip">CSV</span>
+        <span class="chip">JSON</span><span class="chip">MD</span><span class="chip">XML</span>
+      </div>
+      <div class="drop-zone" id="fileDropZone" onclick="document.getElementById('fileInput').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')"
+        ondragleave="this.classList.remove('drag')"
+        ondrop="handleFileDrop(event)">
+        <input type="file" id="fileInput" accept=".pdf,.txt,.csv,.md,.json,.xml" onchange="handleFileSelect(this.files[0])" />
+        <div id="fileDropContent">
+          <div class="drop-icon">📂</div>
+          <div class="drop-label" id="txt-file-drop">Drop a file or click to browse</div>
+        </div>
+      </div>
+      <div id="fileControls" style="display:none">
+        <div class="section-mt">
+          <label class="lbl" id="txt-file-mode">Processing Type</label>
+          <div class="mode-pills">
+            <button class="mode-pill active" onclick="setMode('file','summary',this)" id="txt-fm-summary">Summary</button>
+            <button class="mode-pill" onclick="setMode('file','extract',this)" id="txt-fm-extract">Extract Key Info</button>
+            <button class="mode-pill" onclick="setMode('file','qa',this)" id="txt-fm-qa">Q&A Generation</button>
+            <button class="mode-pill" onclick="setMode('file','translate',this)" id="txt-fm-translate">Translate (EN)</button>
+          </div>
+        </div>
+        <div class="section-mt">
+          <button class="btn-primary" onclick="analyzeFile()" id="fileBtn">▶ <span id="txt-file-btn">Start Analysis</span></button>
+        </div>
+        <div id="fileResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- YOUTUBE PANEL -->
+  <div class="card panel" id="panel-yt">
+    <div class="card-header">
+      <span class="card-icon">📺</span>
+      <div>
+        <div class="card-title" id="txt-yt-title">YouTube Video Analysis</div>
+        <div class="card-desc" id="txt-yt-desc">AI-powered video content summarization and insights</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="warn-box">
+        ⚠ <strong id="txt-yt-warn-title">Copyright Notice:</strong>
+        <span id="txt-yt-warn-body"> YouTube downloading may violate copyright law. DUExt provides AI analysis and summaries only — no downloading.</span>
+      </div>
+      <div class="section-mt">
+        <label class="lbl" id="txt-yt-lbl">YouTube URL</label>
+        <input class="inp" id="ytInput" placeholder="https://youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')analyzeYT()" oninput="updateYTThumb()" />
+      </div>
+      <div id="ytThumb" style="margin-top:14px;display:none">
+        <img id="ytThumbImg" class="img-preview" alt="thumbnail" />
+      </div>
+      <div class="section-mt">
+        <button class="btn-primary" onclick="analyzeYT()" id="ytBtn">🤖 <span id="txt-yt-btn">AI Analyze Video</span></button>
+      </div>
+      <div id="ytResult"></div>
+      <hr class="div" />
+      <div style="font-size:12px;color:var(--muted)" id="txt-yt-formats">
+        Supported: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-team">✦ DUA-X TEAM</div>
+    <div class="footer-copy" id="txt-footer">Built with passion · AI-powered · Open for everyone</div>
+    <div class="footer-links">
+      <a class="footer-link" href="#" id="txt-f-privacy">Privacy Policy</a>
+      <a class="footer-link" href="#" id="txt-f-terms">Terms of Use</a>
+      <a class="footer-link" href="#" id="txt-f-contact">Contact</a>
+    </div>
+  </div>
+
+</div><!-- /wrapper -->
+
+<script>
+/* ===== TRANSLATIONS ===== */
+const LANGS = {
+  en: {
+    tagline:'Download · Upload · Extract',
+    badge1:'⚡ AI Powered', badge2:'🔒 100% Secure', badge3:'🌍 6 Languages', badge4:'✦ Free to Use',
+    apiTitle:'Anthropic API Key Required',
+    apiDesc:'Enter your API key to enable AI features. Keys are stored only in your browser session.',
+    apiBtn:'Save Key',
+    t1v:'SSL Secured', t1l:'End-to-end encrypted',
+    t2v:'No Data Saved', t2l:'We never store your files',
+    t3v:'Instant Processing', t3l:'Results in seconds',
+    t4v:'Claude AI', t4l:'Powered by Anthropic',
+    tabUrl:'URL Analyze', tabImg:'Image', tabFile:'File', tabYt:'YouTube',
+    urlTitle:'URL Analysis & Summarization',
+    urlDesc:'Analyze any web page — summarize, extract keywords, sentiment & SEO insights',
+    urlLbl:'Web Page URL', urlMode:'Analysis Type', urlBtn:'Analyze',
+    mSummary:'Summary', mKeywords:'Keywords', mSentiment:'Sentiment', mSeo:'SEO Report',
+    imgTitle:'Image Conversion & AI Analysis',
+    imgDesc:'Convert between PNG / JPEG / WebP — and analyze with AI',
+    imgDrop:'Drop an image or click to browse',
+    imgFmt:'Output Format', imgConvBtn:'🔄 Convert', imgAiBtn:'🤖 AI Analyze',
+    fileTitle:'File Analysis & Processing',
+    fileDesc:'Analyze PDF, TXT, CSV and other documents with AI',
+    fileDrop:'Drop a file or click to browse',
+    fileMode:'Processing Type', fileBtn:'Start Analysis',
+    fmSummary:'Summary', fmExtract:'Extract Key Info', fmQa:'Q&A Generation', fmTranslate:'Translate',
+    ytTitle:'YouTube Video Analysis',
+    ytDesc:'AI-powered video content summarization and insights',
+    ytWarnTitle:'Copyright Notice:',
+    ytWarnBody:' YouTube downloading may violate copyright law. DUExt provides AI analysis and summaries only.',
+    ytLbl:'YouTube URL', ytBtn:'AI Analyze Video',
+    ytFormats:'Supported: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...',
+    footer:'Built with passion · AI-powered · Open for everyone',
+    privacy:'Privacy Policy', terms:'Terms of Use', contact:'Contact',
+    processing:'Analyzing...', done:'✓ DONE', errNoKey:'⚠ Please add your API key first.',
+    errFail:'Analysis failed. Please check the URL or try again.',
+    urlPrompts: {
+      summary:'Analyze this URL and provide a detailed 4-5 paragraph summary. Include main topics, key points and conclusions.',
+      keywords:'Analyze this URL content and list the 15 most important keywords/topics as JSON: {"keywords":[...]}',
+      sentiment:'Perform a sentiment analysis on this URL content. Provide positive/negative/neutral ratios, overall tone, and examples.',
+      seo:'Analyze this URL from an SEO perspective: title, meta description, content quality, keyword density, structure. Provide a detailed report with recommendations.'
+    },
+    filePrompts: {
+      summary:'Summarize this document in detail. Cover main topics, important information and conclusions.',
+      extract:'Extract all key facts, figures and information from this document in a structured format.',
+      qa:'Generate 5 important questions and answers about this document content.',
+      translate:'Translate the content of this document into English.'
+    },
+    ytPrompt:'Research this YouTube video on the web and provide: 1. Title & channel 2. Content summary 3. Key topics 4. Overall assessment.'
+  },
+  tr: {
+    tagline:'İndir · Yükle · Çıkar',
+    badge1:'⚡ AI Destekli', badge2:'🔒 %100 Güvenli', badge3:'🌍 6 Dil', badge4:'✦ Ücretsiz',
+    apiTitle:'Anthropic API Anahtarı Gerekli',
+    apiDesc:'AI özelliklerini etkinleştirmek için API anahtarınızı girin. Anahtarlar yalnızca tarayıcı oturumunuzda saklanır.',
+    apiBtn:'Kaydet',
+    t1v:'SSL Korumalı', t1l:'Uçtan uca şifreli',
+    t2v:'Veri Saklanmaz', t2l:'Dosyalarınızı asla saklamıyoruz',
+    t3v:'Anında İşlem', t3l:'Sonuçlar saniyeler içinde',
+    t4v:'Claude AI', t4l:'Anthropic tarafından',
+    tabUrl:'URL Analiz', tabImg:'Görsel', tabFile:'Dosya', tabYt:'YouTube',
+    urlTitle:'URL Analiz & Özetleme',
+    urlDesc:'Herhangi bir web sayfasını analiz et — özet, anahtar kelimeler, duygu & SEO',
+    urlLbl:'Web Sayfası URL', urlMode:'Analiz Türü', urlBtn:'Analiz Et',
+    mSummary:'Özet', mKeywords:'Anahtar Kelimeler', mSentiment:'Duygu Analizi', mSeo:'SEO Raporu',
+    imgTitle:'Görsel Dönüştürme & AI Analizi',
+    imgDesc:'PNG / JPEG / WebP arası dönüştür — AI ile analiz et',
+    imgDrop:'Görsel sürükle veya tıkla',
+    imgFmt:'Çıktı Formatı', imgConvBtn:'🔄 Dönüştür', imgAiBtn:'🤖 AI Analiz',
+    fileTitle:'Dosya Analiz & İşleme',
+    fileDesc:'PDF, TXT, CSV ve diğer dosyaları AI ile analiz et',
+    fileDrop:'Dosya sürükle veya tıkla',
+    fileMode:'İşlem Türü', fileBtn:'Analizi Başlat',
+    fmSummary:'Özet', fmExtract:'Bilgi Çıkar', fmQa:'Soru & Cevap', fmTranslate:'Çeviri',
+    ytTitle:'YouTube Video Analizi',
+    ytDesc:'AI destekli video içerik özetleme ve görüşler',
+    ytWarnTitle:'Telif Hakkı Notu:',
+    ytWarnBody:' YouTube indirme telif hakkı ihlali oluşturabilir. DUExt yalnızca AI analizi sunar.',
+    ytLbl:'YouTube URL', ytBtn:'AI ile Analiz Et',
+    ytFormats:'Desteklenen: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...',
+    footer:'Tutkuyla yapıldı · AI destekli · Herkese açık',
+    privacy:'Gizlilik Politikası', terms:'Kullanım Koşulları', contact:'İletişim',
+    processing:'Analiz ediliyor...', done:'✓ TAMAMLANDI', errNoKey:'⚠ Lütfen önce API anahtarınızı ekleyin.',
+    errFail:'Analiz başarısız. URL\'yi kontrol edin veya tekrar deneyin.',
+    urlPrompts: {
+      summary:'Bu URL\'deki içeriği Türkçe olarak 4-5 paragraf halinde detaylı özetle. Ana konuları, önemli noktaları ve sonuçları belirt.',
+      keywords:'Bu URL içeriğini analiz et ve en önemli 15 anahtar kelimeyi JSON olarak listele: {"keywords":[...]}',
+      sentiment:'Bu URL içeriğinin duygu analizini yap. Pozitif/negatif/nötr oranları, genel ton ve örnekler ver. Türkçe yanıtla.',
+      seo:'Bu URL\'i SEO açısından analiz et: başlık, meta açıklama, içerik kalitesi, anahtar kelime yoğunluğu, yapı. Önerilerle Türkçe raporla.'
+    },
+    filePrompts: {
+      summary:'Bu belgeyi detaylıca Türkçe özetle. Ana konular, önemli bilgiler ve sonuçları yaz.',
+      extract:'Bu belgeden tüm önemli bilgileri, rakamları ve verileri yapılandırılmış formatta çıkar.',
+      qa:'Bu belge içeriği hakkında 5 önemli soru ve cevabı Türkçe oluştur.',
+      translate:'Bu belgenin içeriğini Türkçe\'ye çevir.'
+    },
+    ytPrompt:'Bu YouTube videosunu web\'den araştır ve şunları bul: 1. Başlık ve kanal 2. İçerik özeti 3. Önemli konular 4. Genel değerlendirme. Türkçe yanıtla.'
+  },
+  de: {
+    tagline:'Herunterladen · Hochladen · Extrahieren',
+    badge1:'⚡ KI-gestützt', badge2:'🔒 100% Sicher', badge3:'🌍 6 Sprachen', badge4:'✦ Kostenlos',
+    apiTitle:'Anthropic API-Schlüssel erforderlich',
+    apiDesc:'Geben Sie Ihren API-Schlüssel ein, um KI-Funktionen zu aktivieren.',
+    apiBtn:'Speichern',
+    t1v:'SSL-gesichert', t1l:'Ende-zu-Ende verschlüsselt',
+    t2v:'Keine Datenspeicherung', t2l:'Wir speichern niemals Ihre Dateien',
+    t3v:'Sofortige Verarbeitung', t3l:'Ergebnisse in Sekunden',
+    t4v:'Claude KI', t4l:'Unterstützt von Anthropic',
+    tabUrl:'URL Analyse', tabImg:'Bild', tabFile:'Datei', tabYt:'YouTube',
+    urlTitle:'URL-Analyse & Zusammenfassung',
+    urlDesc:'Analysieren Sie jede Webseite — Zusammenfassung, Schlüsselwörter, Stimmung & SEO',
+    urlLbl:'Webseiten-URL', urlMode:'Analyse-Typ', urlBtn:'Analysieren',
+    mSummary:'Zusammenfassung', mKeywords:'Schlüsselwörter', mSentiment:'Stimmung', mSeo:'SEO-Bericht',
+    imgTitle:'Bildkonvertierung & KI-Analyse',
+    imgDesc:'Zwischen PNG / JPEG / WebP konvertieren — und mit KI analysieren',
+    imgDrop:'Bild hier ablegen oder klicken',
+    imgFmt:'Ausgabeformat', imgConvBtn:'🔄 Konvertieren', imgAiBtn:'🤖 KI-Analyse',
+    fileTitle:'Dateianalyse & Verarbeitung',
+    fileDesc:'PDF, TXT, CSV und andere Dokumente mit KI analysieren',
+    fileDrop:'Datei hier ablegen oder klicken',
+    fileMode:'Verarbeitungstyp', fileBtn:'Analyse starten',
+    fmSummary:'Zusammenfassung', fmExtract:'Schlüsselinfos', fmQa:'Fragen & Antworten', fmTranslate:'Übersetzen',
+    ytTitle:'YouTube-Videoanalyse',
+    ytDesc:'KI-gestützte Videoinhaltsanalyse',
+    ytWarnTitle:'Urheberrechtshinweis:',
+    ytWarnBody:' YouTube-Downloads können gegen das Urheberrecht verstoßen. DUExt bietet nur KI-Analysen an.',
+    ytLbl:'YouTube-URL', ytBtn:'KI-Analyse',
+    ytFormats:'Unterstützt: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...',
+    footer:'Mit Leidenschaft gebaut · KI-gestützt · Für alle',
+    privacy:'Datenschutz', terms:'Nutzungsbedingungen', contact:'Kontakt',
+    processing:'Wird analysiert...', done:'✓ FERTIG', errNoKey:'⚠ Bitte zuerst API-Schlüssel eingeben.',
+    errFail:'Analyse fehlgeschlagen. URL prüfen oder erneut versuchen.',
+    urlPrompts:{summary:'Analysiere diese URL und erstelle eine detaillierte 4-5 Absätze lange Zusammenfassung auf Deutsch.',keywords:'Analysiere den Inhalt dieser URL und liste die 15 wichtigsten Keywords als JSON: {"keywords":[...]}',sentiment:'Führe eine Stimmungsanalyse des Inhalts dieser URL durch. Gib positive/negative/neutrale Anteile an.',seo:'Analysiere diese URL aus SEO-Sicht: Titel, Meta-Beschreibung, Inhaltsqualität, Keyword-Dichte, Struktur. Erstelle einen Bericht auf Deutsch.'},
+    filePrompts:{summary:'Fasse dieses Dokument auf Deutsch zusammen.',extract:'Extrahiere alle wichtigen Fakten und Informationen aus diesem Dokument.',qa:'Erstelle 5 wichtige Fragen und Antworten zum Inhalt dieses Dokuments auf Deutsch.',translate:'Übersetze den Inhalt dieses Dokuments ins Deutsche.'},
+    ytPrompt:'Recherchiere dieses YouTube-Video und liefere: 1. Titel & Kanal 2. Inhaltszusammenfassung 3. Hauptthemen 4. Gesamtbewertung. Antworte auf Deutsch.'
+  },
+  fr: {
+    tagline:'Télécharger · Envoyer · Extraire',
+    badge1:'⚡ Propulsé par IA', badge2:'🔒 100% Sécurisé', badge3:'🌍 6 Langues', badge4:'✦ Gratuit',
+    apiTitle:'Clé API Anthropic requise',
+    apiDesc:'Entrez votre clé API pour activer les fonctionnalités IA.',
+    apiBtn:'Enregistrer',
+    t1v:'Sécurisé SSL', t1l:'Chiffrement de bout en bout',
+    t2v:'Aucune donnée', t2l:'Nous ne stockons jamais vos fichiers',
+    t3v:'Traitement instant', t3l:'Résultats en secondes',
+    t4v:'Claude IA', t4l:'Propulsé par Anthropic',
+    tabUrl:'Analyser URL', tabImg:'Image', tabFile:'Fichier', tabYt:'YouTube',
+    urlTitle:'Analyse & Résumé d\'URL',
+    urlDesc:'Analysez n\'importe quelle page web — résumé, mots-clés, sentiment & SEO',
+    urlLbl:'URL de la page web', urlMode:'Type d\'analyse', urlBtn:'Analyser',
+    mSummary:'Résumé', mKeywords:'Mots-clés', mSentiment:'Sentiment', mSeo:'Rapport SEO',
+    imgTitle:'Conversion & Analyse IA d\'images',
+    imgDesc:'Convertissez entre PNG / JPEG / WebP — et analysez avec IA',
+    imgDrop:'Déposez une image ou cliquez',
+    imgFmt:'Format de sortie', imgConvBtn:'🔄 Convertir', imgAiBtn:'🤖 Analyser',
+    fileTitle:'Analyse & Traitement de fichiers',
+    fileDesc:'Analysez PDF, TXT, CSV et d\'autres documents avec l\'IA',
+    fileDrop:'Déposez un fichier ou cliquez',
+    fileMode:'Type de traitement', fileBtn:'Démarrer l\'analyse',
+    fmSummary:'Résumé', fmExtract:'Extraire', fmQa:'Questions & Réponses', fmTranslate:'Traduire',
+    ytTitle:'Analyse de vidéo YouTube',
+    ytDesc:'Résumé de contenu vidéo par IA',
+    ytWarnTitle:'Avis de droit d\'auteur :',
+    ytWarnBody:' Le téléchargement YouTube peut violer le droit d\'auteur. DUExt propose uniquement des analyses IA.',
+    ytLbl:'URL YouTube', ytBtn:'Analyser avec IA',
+    ytFormats:'Pris en charge: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...',
+    footer:'Fait avec passion · IA · Pour tous',
+    privacy:'Politique de confidentialité', terms:'Conditions d\'utilisation', contact:'Contact',
+    processing:'Analyse en cours...', done:'✓ TERMINÉ', errNoKey:'⚠ Veuillez d\'abord entrer votre clé API.',
+    errFail:'Analyse échouée. Vérifiez l\'URL ou réessayez.',
+    urlPrompts:{summary:'Analysez cette URL et fournissez un résumé détaillé en 4-5 paragraphes en français.',keywords:'Analysez le contenu de cette URL et listez les 15 mots-clés les plus importants en JSON: {"keywords":[...]}',sentiment:'Effectuez une analyse de sentiment du contenu de cette URL. Donnez des ratios positif/négatif/neutre.',seo:'Analysez cette URL d\'un point de vue SEO: titre, méta-description, qualité du contenu. Rapport en français.'},
+    filePrompts:{summary:'Résumez ce document en détail en français.',extract:'Extrayez tous les faits et informations clés de ce document.',qa:'Générez 5 questions et réponses importantes sur ce document en français.',translate:'Traduisez le contenu de ce document en français.'},
+    ytPrompt:'Recherchez cette vidéo YouTube et fournissez: 1. Titre & chaîne 2. Résumé 3. Sujets clés 4. Évaluation. Répondez en français.'
+  },
+  es: {
+    tagline:'Descargar · Subir · Extraer',
+    badge1:'⚡ Potenciado por IA', badge2:'🔒 100% Seguro', badge3:'🌍 6 Idiomas', badge4:'✦ Gratis',
+    apiTitle:'Se requiere clave API de Anthropic',
+    apiDesc:'Ingrese su clave API para habilitar las funciones de IA.',
+    apiBtn:'Guardar',
+    t1v:'Seguridad SSL', t1l:'Cifrado de extremo a extremo',
+    t2v:'Sin datos guardados', t2l:'Nunca almacenamos sus archivos',
+    t3v:'Procesamiento instantáneo', t3l:'Resultados en segundos',
+    t4v:'Claude IA', t4l:'Impulsado por Anthropic',
+    tabUrl:'Analizar URL', tabImg:'Imagen', tabFile:'Archivo', tabYt:'YouTube',
+    urlTitle:'Análisis y Resumen de URL',
+    urlDesc:'Analice cualquier página web — resumen, palabras clave, sentimiento y SEO',
+    urlLbl:'URL de la página web', urlMode:'Tipo de análisis', urlBtn:'Analizar',
+    mSummary:'Resumen', mKeywords:'Palabras clave', mSentiment:'Sentimiento', mSeo:'Informe SEO',
+    imgTitle:'Conversión y Análisis IA de imágenes',
+    imgDesc:'Convierte entre PNG / JPEG / WebP — y analiza con IA',
+    imgDrop:'Suelta una imagen o haz clic',
+    imgFmt:'Formato de salida', imgConvBtn:'🔄 Convertir', imgAiBtn:'🤖 Analizar',
+    fileTitle:'Análisis y procesamiento de archivos',
+    fileDesc:'Analice PDF, TXT, CSV y otros documentos con IA',
+    fileDrop:'Suelta un archivo o haz clic',
+    fileMode:'Tipo de procesamiento', fileBtn:'Iniciar análisis',
+    fmSummary:'Resumen', fmExtract:'Extraer info', fmQa:'Preguntas y Respuestas', fmTranslate:'Traducir',
+    ytTitle:'Análisis de video de YouTube',
+    ytDesc:'Resumen de contenido de video impulsado por IA',
+    ytWarnTitle:'Aviso de derechos de autor:',
+    ytWarnBody:' Descargar YouTube puede violar los derechos de autor. DUExt solo ofrece análisis IA.',
+    ytLbl:'URL de YouTube', ytBtn:'Analizar con IA',
+    ytFormats:'Compatible: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...',
+    footer:'Hecho con pasión · IA · Para todos',
+    privacy:'Política de privacidad', terms:'Términos de uso', contact:'Contacto',
+    processing:'Analizando...', done:'✓ LISTO', errNoKey:'⚠ Por favor ingrese su clave API primero.',
+    errFail:'Análisis fallido. Verifique la URL o inténtelo de nuevo.',
+    urlPrompts:{summary:'Analice esta URL y proporcione un resumen detallado de 4-5 párrafos en español.',keywords:'Analice el contenido de esta URL y liste las 15 palabras clave más importantes en JSON: {"keywords":[...]}',sentiment:'Realice un análisis de sentimiento del contenido de esta URL. Proporcione ratios positivo/negativo/neutro.',seo:'Analice esta URL desde una perspectiva SEO. Informe en español.'},
+    filePrompts:{summary:'Resume este documento en detalle en español.',extract:'Extrae todos los hechos e información clave de este documento.',qa:'Genera 5 preguntas y respuestas importantes sobre este documento en español.',translate:'Traduce el contenido de este documento al español.'},
+    ytPrompt:'Investiga este video de YouTube y proporciona: 1. Título y canal 2. Resumen 3. Temas clave 4. Evaluación. Responde en español.'
+  },
+  ar: {
+    tagline:'تنزيل · رفع · استخراج',
+    badge1:'⚡ مدعوم بالذكاء الاصطناعي', badge2:'🔒 آمن 100٪', badge3:'🌍 6 لغات', badge4:'✦ مجاني',
+    apiTitle:'مطلوب مفتاح API من Anthropic',
+    apiDesc:'أدخل مفتاح API الخاص بك لتفعيل ميزات الذكاء الاصطناعي.',
+    apiBtn:'حفظ',
+    t1v:'مؤمّن بـ SSL', t1l:'تشفير من طرف إلى طرف',
+    t2v:'لا يتم حفظ البيانات', t2l:'لا نخزن ملفاتك أبداً',
+    t3v:'معالجة فورية', t3l:'النتائج في ثوانٍ',
+    t4v:'Claude AI', t4l:'مدعوم من Anthropic',
+    tabUrl:'تحليل URL', tabImg:'صورة', tabFile:'ملف', tabYt:'يوتيوب',
+    urlTitle:'تحليل وتلخيص الروابط',
+    urlDesc:'حلل أي صفحة ويب — ملخص، كلمات مفتاحية، مشاعر وتحسين محركات البحث',
+    urlLbl:'رابط صفحة الويب', urlMode:'نوع التحليل', urlBtn:'تحليل',
+    mSummary:'ملخص', mKeywords:'كلمات مفتاحية', mSentiment:'تحليل المشاعر', mSeo:'تقرير SEO',
+    imgTitle:'تحويل الصور وتحليلها بالذكاء الاصطناعي',
+    imgDesc:'تحويل بين PNG / JPEG / WebP — وتحليل بالذكاء الاصطناعي',
+    imgDrop:'اسحب صورة أو انقر للتصفح',
+    imgFmt:'تنسيق الإخراج', imgConvBtn:'🔄 تحويل', imgAiBtn:'🤖 تحليل',
+    fileTitle:'تحليل ومعالجة الملفات',
+    fileDesc:'حلل PDF وTXT وCSV والمستندات الأخرى بالذكاء الاصطناعي',
+    fileDrop:'اسحب ملفاً أو انقر للتصفح',
+    fileMode:'نوع المعالجة', fileBtn:'بدء التحليل',
+    fmSummary:'ملخص', fmExtract:'استخراج معلومات', fmQa:'أسئلة وأجوبة', fmTranslate:'ترجمة',
+    ytTitle:'تحليل فيديو يوتيوب',
+    ytDesc:'تلخيص محتوى الفيديو بالذكاء الاصطناعي',
+    ytWarnTitle:'تنبيه حقوق النشر:',
+    ytWarnBody:' تنزيل يوتيوب قد ينتهك حقوق النشر. يوفر DUExt تحليلات الذكاء الاصطناعي فقط.',
+    ytLbl:'رابط يوتيوب', ytBtn:'تحليل الفيديو بالذكاء الاصطناعي',
+    ytFormats:'مدعوم: youtube.com/watch?v=... · youtu.be/... · youtube.com/shorts/...',
+    footer:'مبني بشغف · مدعوم بالذكاء الاصطناعي · للجميع',
+    privacy:'سياسة الخصوصية', terms:'شروط الاستخدام', contact:'تواصل معنا',
+    processing:'جارٍ التحليل...', done:'✓ مكتمل', errNoKey:'⚠ الرجاء إدخال مفتاح API أولاً.',
+    errFail:'فشل التحليل. تحقق من الرابط أو حاول مرة أخرى.',
+    urlPrompts:{summary:'حلل هذا الرابط وقدم ملخصاً تفصيلياً من 4-5 فقرات باللغة العربية.',keywords:'حلل محتوى هذا الرابط وأدرج أهم 15 كلمة مفتاحية بتنسيق JSON: {"keywords":[...]}',sentiment:'أجر تحليل مشاعر على محتوى هذا الرابط. قدم نسب إيجابي/سلبي/محايد.',seo:'حلل هذا الرابط من منظور تحسين محركات البحث. قرير بالعربية.'},
+    filePrompts:{summary:'لخص هذه الوثيقة بالتفصيل باللغة العربية.',extract:'استخرج جميع الحقائق والمعلومات الرئيسية من هذه الوثيقة.',qa:'أنشئ 5 أسئلة وأجوبة مهمة حول محتوى هذه الوثيقة باللغة العربية.',translate:'ترجم محتوى هذه الوثيقة إلى العربية.'},
+    ytPrompt:'ابحث عن هذا الفيديو على يوتيوب وقدم: 1. العنوان والقناة 2. ملخص المحتوى 3. المواضيع الرئيسية 4. التقييم العام. أجب باللغة العربية.'
+  }
+};
+
+let currentLang = 'en';
+const urlMode = {val:'summary'};
+const fileMode = {val:'summary'};
+let currentImgData = null;
+let currentFileData = null;
+
+/* ===== LANGUAGE SYSTEM ===== */
+function initLangSwitcher() {
+  const sw = document.getElementById('langSwitcher');
+  const langNames = {en:'EN',tr:'TR',de:'DE',fr:'FR',es:'ES',ar:'AR'};
+  Object.keys(langNames).forEach(code => {
+    const btn = document.createElement('button');
+    btn.className = 'lang-btn' + (code === 'en' ? ' active' : '');
+    btn.textContent = langNames[code];
+    btn.onclick = () => setLang(code);
+    btn.id = 'lang-' + code;
+    sw.appendChild(btn);
+  });
+}
+
+function setLang(code) {
+  currentLang = code;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('lang-' + code).classList.add('active');
+  // RTL for Arabic
+  document.body.dir = code === 'ar' ? 'rtl' : 'ltr';
+  applyTranslations();
+}
+
+function t(key) { return LANGS[currentLang][key] || LANGS['en'][key] || key; }
+
+function applyTranslations() {
+  const L = LANGS[currentLang];
+  const set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  set('txt-tagline', L.tagline);
+  set('txt-badge1', L.badge1); set('txt-badge2', L.badge2);
+  set('txt-badge3', L.badge3); set('txt-badge4', L.badge4);
+  set('txt-api-title', L.apiTitle); set('txt-api-desc', L.apiDesc); set('txt-api-btn', L.apiBtn);
+  set('txt-t1v', L.t1v); set('txt-t1l', L.t1l); set('txt-t2v', L.t2v); set('txt-t2l', L.t2l);
+  set('txt-t3v', L.t3v); set('txt-t3l', L.t3l); set('txt-t4v', L.t4v); set('txt-t4l', L.t4l);
+  set('txt-tab-url', L.tabUrl); set('txt-tab-image', L.tabImg);
+  set('txt-tab-file', L.tabFile); set('txt-tab-yt', L.tabYt);
+  set('txt-url-title', L.urlTitle); set('txt-url-desc', L.urlDesc);
+  set('txt-url-lbl', L.urlLbl); set('txt-url-mode', L.urlMode); set('txt-url-btn', L.urlBtn);
+  set('txt-m-summary', L.mSummary); set('txt-m-keywords', L.mKeywords);
+  set('txt-m-sentiment', L.mSentiment); set('txt-m-seo', L.mSeo);
+  set('txt-img-title', L.imgTitle); set('txt-img-desc', L.imgDesc);
+  set('txt-img-drop', L.imgDrop); set('txt-img-fmt', L.imgFmt);
+  set('txt-img-conv-btn', L.imgConvBtn); set('txt-img-ai-btn', L.imgAiBtn);
+  set('txt-file-title', L.fileTitle); set('txt-file-desc', L.fileDesc);
+  set('txt-file-drop', L.fileDrop); set('txt-file-mode', L.fileMode); set('txt-file-btn', L.fileBtn);
+  set('txt-fm-summary', L.fmSummary); set('txt-fm-extract', L.fmExtract);
+  set('txt-fm-qa', L.fmQa); set('txt-fm-translate', L.fmTranslate);
+  set('txt-yt-title', L.ytTitle); set('txt-yt-desc', L.ytDesc);
+  set('txt-yt-warn-title', L.ytWarnTitle); set('txt-yt-warn-body', L.ytWarnBody);
+  set('txt-yt-lbl', L.ytLbl); set('txt-yt-btn', L.ytBtn);
+  set('txt-yt-formats', L.ytFormats);
+  set('txt-footer', L.footer);
+  set('txt-f-privacy', L.privacy); set('txt-f-terms', L.terms); set('txt-f-contact', L.contact);
+  // placeholder
+  const urlInput = document.getElementById('urlInput');
+  if(urlInput) urlInput.placeholder = 'https://example.com/article';
+}
+
+/* ===== API KEY (disabled - proxy mode) ===== */
+function saveApiKey() {
+  // Not used in proxy mode
+  console.log('Proxy mode active — no key needed.');
+}
+
+/* ===== PROXY CONFIG ===== */
+// Worker deploy ettikten sonra bu URL'yi kendi Worker URL'nle değiştir:
+const WORKER_URL = 'https://duext.kazerevil.workers.dev';
+
+/* ===== AI API (Groq via Cloudflare Worker Proxy) ===== */
+async function callClaude(messages, useSearch = false) {
+  // Mesajları Groq'a uygun formata çevir (text ve image destekli)
+  const groqMessages = messages.map(msg => {
+    if (typeof msg.content === 'string') {
+      return { role: msg.role, content: msg.content };
+    }
+    // Çoklu içerik bloğu (image, document vb.)
+    const textParts = (msg.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n');
+    const imageParts = (msg.content || [])
+      .filter(b => b.type === 'image')
+      .map(b => `[Kullanıcı bir görsel yükledi. Lütfen genel bir görsel analizi yap: içerik, renkler, kompozisyon ve öne çıkan detayları açıkla.]`)
+      .join('\n');
+    const docParts = (msg.content || [])
+      .filter(b => b.type === 'document')
+      .map(b => `[Kullanıcı bir PDF belgesi yükledi. Lütfen belgeyi analiz et.]`)
+      .join('\n');
+    return {
+      role: msg.role,
+      content: [textParts, imageParts, docParts].filter(Boolean).join('\n')
+    };
+  });
+
+  const res = await fetch(WORKER_URL + '/v1/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 1200,
+      messages: groqMessages
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return (data.content || []).map(b => b.text || '').filter(Boolean).join('\n');
+}
+
+/* ===== TABS ===== */
+function switchTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => { t.className = 'tab'; });
+  document.getElementById('panel-' + id).classList.add('active');
+  btn.classList.add('active-' + (id === 'yt' ? 'yt' : id));
+}
+
+/* ===== MODE PILLS ===== */
+function setMode(ctx, val, btn) {
+  const container = btn.closest('.mode-pills');
+  container.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  if (ctx === 'url') urlMode.val = val;
+  else fileMode.val = val;
+}
+
+/* ===== RESULT HELPERS ===== */
+function showResult(containerId, html) {
+  document.getElementById(containerId).innerHTML = html;
+}
+function resultBox(content, type='ok') {
+  const badge = type === 'ok'
+    ? `<span class="status-badge status-ok">✓ ${t('done')}</span>`
+    : `<span class="status-badge status-ai">🤖 AI</span>`;
+  return `<div class="result-box">${badge}<div class="result-text">${escHtml(content)}</div></div>`;
+}
+function errBox(msg) {
+  return `<div class="result-box"><span class="status-badge status-err">⚠ ERROR</span><div class="result-text">${escHtml(msg)}</div></div>`;
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function loadingBtn(id, on) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  if (on) {
+    btn._orig = btn.innerHTML;
+    btn.innerHTML = `<span class="spinner"></span>${t('processing')}`;
+    btn.disabled = true;
+  } else {
+    btn.innerHTML = btn._orig || btn.innerHTML;
+    btn.disabled = false;
+  }
+}
+
+/* ===== URL ANALYSIS ===== */
+async function analyzeUrl() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) return;
+  loadingBtn('urlBtn', true);
+  showResult('urlResult', '');
+  try {
+    const prompts = LANGS[currentLang].urlPrompts;
+    const text = await callClaude([{role:'user',content:`URL: ${url}\n\n${prompts[urlMode.val]}`}], true);
+    showResult('urlResult', resultBox(text));
+  } catch(e) {
+    showResult('urlResult', errBox(t('errFail')));
+  }
+  loadingBtn('urlBtn', false);
+}
+
+/* ===== IMAGE CONVERSION ===== */
+function handleImgDrop(e) {
+  e.preventDefault();
+  document.getElementById('imgDropZone').classList.remove('drag');
+  handleImgFile(e.dataTransfer.files[0]);
+}
+function handleImgFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentImgData = { src: ev.target.result, name: file.name, type: file.type, size: file.size };
+    const sz = file.size > 1048576 ? `${(file.size/1048576).toFixed(1)} MB` : `${(file.size/1024).toFixed(0)} KB`;
+    document.getElementById('imgDropContent').innerHTML = `
+      <img src="${ev.target.result}" class="img-preview" alt="preview" />
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">${escHtml(file.name)} — ${sz}</div>`;
+    document.getElementById('imgControls').style.display = 'block';
+    showResult('imgResult', '');
+  };
+  reader.readAsDataURL(file);
+}
+function convertImage() {
+  if (!currentImgData) return;
+  const fmt = document.getElementById('imgFormat').value;
+  const qual = parseInt(document.getElementById('qualRange').value) / 100;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.getElementById('convertCanvas');
+    c.width = img.width; c.height = img.height;
+    c.getContext('2d').drawImage(img, 0, 0);
+    const extMap = {'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
+    const ext = extMap[fmt] || 'png';
+    const fmtNames = {'image/png':'PNG','image/jpeg':'JPEG','image/webp':'WebP'};
+    const dataUrl = c.toDataURL(fmt, qual);
+    const sz = Math.round(dataUrl.length * 0.75);
+    const szStr = sz > 1048576 ? `${(sz/1048576).toFixed(1)} MB` : `${(sz/1024).toFixed(0)} KB`;
+    showResult('imgResult', `
+      <div class="result-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <span class="status-badge status-ok">✓ ${fmtNames[fmt]}</span>
+          <a href="${dataUrl}" download="duext_${Date.now()}.${ext}" class="btn-download">⬇ Download</a>
+        </div>
+        <img src="${dataUrl}" class="img-preview" alt="converted" />
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Size: ~${szStr}</div>
+      </div>`);
+  };
+  img.src = currentImgData.src;
+}
+async function analyzeImageAI() {
+  if (!currentImgData) return;
+  const btn = document.getElementById('txt-img-ai-btn').closest('button');
+  btn.disabled = true; btn._o = btn.innerHTML;
+  btn.innerHTML = `<span class="spinner"></span>${t('processing')}`;
+  try {
+    const base64 = currentImgData.src.split(',')[1];
+    const text = await callClaude([{role:'user',content:[
+      {type:'image',source:{type:'base64',media_type:currentImgData.type,data:base64}},
+      {type:'text',text:'Analyze this image in detail: content, colors, composition, technical details, notable elements.'}
+    ]}]);
+    const existing = document.getElementById('imgResult').innerHTML;
+    document.getElementById('imgResult').innerHTML = existing +
+      `<div class="result-box" style="margin-top:12px;"><span class="status-badge status-ai">🤖 AI</span><div class="result-text">${escHtml(text)}</div></div>`;
+  } catch(e) {
+    document.getElementById('imgResult').innerHTML += errBox(t('errFail'));
+  }
+  btn.innerHTML = btn._o; btn.disabled = false;
+}
+
+/* ===== FILE ANALYSIS ===== */
+function handleFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('fileDropZone').classList.remove('drag');
+  handleFileSelect(e.dataTransfer.files[0]);
+}
+function handleFileSelect(file) {
+  if (!file) return;
+  currentFileData = file;
+  const sz = file.size > 1048576 ? `${(file.size/1048576).toFixed(1)} MB` : `${(file.size/1024).toFixed(0)} KB`;
+  const icon = file.type === 'application/pdf' ? '📑' : '📝';
+  document.getElementById('fileDropContent').innerHTML = `
+    <div style="font-size:28px;margin-bottom:8px;">${icon}</div>
+    <div style="font-size:13px;color:var(--text);font-weight:600;">${escHtml(file.name)}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">${sz}</div>`;
+  document.getElementById('fileControls').style.display = 'block';
+  showResult('fileResult', '');
+}
+async function analyzeFile() {
+  if (!currentFileData) return;
+  loadingBtn('fileBtn', true);
+  showResult('fileResult', '');
+  try {
+    const prompts = LANGS[currentLang].filePrompts;
+    const prompt = prompts[fileMode.val];
+    let text;
+    if (currentFileData.type === 'application/pdf') {
+      const base64 = await readBase64(currentFileData);
+      text = await callClaude([{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
+        {type:'text',text:prompt}
+      ]}]);
+    } else {
+      const textContent = await readText(currentFileData);
+      text = await callClaude([{role:'user',content:`File: ${currentFileData.name}\n\n${textContent.substring(0,4000)}\n\n${prompt}`}]);
+    }
+    showResult('fileResult', resultBox(text));
+  } catch(e) {
+    showResult('fileResult', errBox(t('errFail')));
+  }
+  loadingBtn('fileBtn', false);
+}
+function readBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+function readText(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsText(file);
+  });
+}
+
+/* ===== YOUTUBE ===== */
+function getVideoId(url) {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^&\n?#]+)/);
+  return m ? m[1] : null;
+}
+function updateYTThumb() {
+  const url = document.getElementById('ytInput').value;
+  const id = getVideoId(url);
+  const wrap = document.getElementById('ytThumb');
+  if (id) {
+    document.getElementById('ytThumbImg').src = `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+    wrap.style.display = 'block';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+async function analyzeYT() {
+  const url = document.getElementById('ytInput').value.trim();
+  if (!url) return;
+  loadingBtn('ytBtn', true);
+  showResult('ytResult', '');
+  try {
+    const id = getVideoId(url);
+    const prompt = LANGS[currentLang].ytPrompt;
+    const text = await callClaude([{role:'user',content:`YouTube URL: ${url}${id?`\nVideo ID: ${id}`:''}\n\n${prompt}`}], true);
+    showResult('ytResult', resultBox(text));
+  } catch(e) {
+    showResult('ytResult', errBox(t('errFail')));
+  }
+  loadingBtn('ytBtn', false);
+}
+
+/* ===== BACKGROUND CANVAS ANIMATION ===== */
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [], orbs = [];
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const COLORS = ['#00e5ff','#b06eff','#00ff88','#ff7b3a','#ff4da6'];
+
+  // Particles
+  for (let i = 0; i < 70; i++) {
+    particles.push({
+      x: Math.random() * 2000,
+      y: Math.random() * 1200,
+      r: Math.random() * 1.5 + 0.3,
+      vx: (Math.random() - .5) * .25,
+      vy: (Math.random() - .5) * .25,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      alpha: Math.random() * .5 + .15
+    });
+  }
+
+  // Orbs (large blobs)
+  for (let i = 0; i < 4; i++) {
+    orbs.push({
+      x: Math.random() * 1600 + 200,
+      y: Math.random() * 900 + 100,
+      r: Math.random() * 200 + 120,
+      vx: (Math.random() - .5) * .4,
+      vy: (Math.random() - .5) * .4,
+      color: COLORS[i % COLORS.length],
+      alpha: 0.035 + Math.random() * 0.025
+    });
+  }
+
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    t += .005;
+
+    // Draw orbs
+    orbs.forEach(o => {
+      o.x += o.vx; o.y += o.vy;
+      if (o.x < -o.r) o.x = W + o.r;
+      if (o.x > W + o.r) o.x = -o.r;
+      if (o.y < -o.r) o.y = H + o.r;
+      if (o.y > H + o.r) o.y = -o.r;
+      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
+      g.addColorStop(0, o.color + Math.round(o.alpha * 255).toString(16).padStart(2,'0'));
+      g.addColorStop(1, 'transparent');
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fillStyle = g;
+      ctx.fill();
+    });
+
+    // Draw particles
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color + Math.round(p.alpha * 255).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+
+    // Scan line sweep
+    const scanY = ((Math.sin(t * .7) + 1) / 2) * H;
+    const scanG = ctx.createLinearGradient(0, scanY - 60, 0, scanY + 60);
+    scanG.addColorStop(0, 'transparent');
+    scanG.addColorStop(.5, 'rgba(0,229,255,0.018)');
+    scanG.addColorStop(1, 'transparent');
+    ctx.fillStyle = scanG;
+    ctx.fillRect(0, scanY - 60, W, 120);
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ===== INIT ===== */
+initLangSwitcher();
+applyTranslations();
+
+// Format select toggle quality
+document.getElementById('imgFormat').addEventListener('change', function() {
+  document.getElementById('qualityWrap').style.display = this.value === 'image/jpeg' ? 'block' : 'none';
+});
+document.getElementById('qualityWrap').style.display = 'none';
+</script>
+</body>
+</html>
